@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Scripts de Configuración de PC - Técnicos</title>
+    <!-- Bootstrap 5 CDN para estilos responsivos y modernos -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Estilos personalizados para el tema de Terminal */
+        :root {
+            --terminal-bg: #1e1e1e; /* Fondo oscuro */
+            --terminal-text: #00ff00; /* Texto principal (Verde brillante) */
+            --terminal-secondary-text: #00ffff; /* Texto secundario (Cyan) */
+            --terminal-border: #333; /* Borde oscuro */
+            --terminal-header-bg: #2d2d2d; /* Fondo de encabezado ligeramente más claro */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000000; /* Fondo del body negro puro */
+        }
+        /* Contenedor principal con estilo de terminal */
+        .terminal-container {
+            background-color: var(--terminal-bg);
+            color: var(--terminal-text);
+            border: 2px solid var(--terminal-secondary-text);
+            box-shadow: 0 0 10px var(--terminal-secondary-text);
+        }
+        /* Estilo para el contenedor de código */
+        .code-block {
+            background-color: #000000; 
+            color: #d4d4d4; /* Color de texto claro para el código */
+            padding: 1rem;
+            border-radius: 0.25rem;
+            overflow-x: auto;
+            white-space: pre-wrap; 
+            word-wrap: break-word;
+            line-height: 1.5;
+            font-family: 'Fira Code', 'Consolas', 'Monospace';
+            font-size: 0.875rem;
+        }
+        .terminal-title {
+            color: var(--terminal-secondary-text);
+        }
+        .terminal-header {
+            background-color: var(--terminal-header-bg);
+            border-bottom: 1px solid var(--terminal-border);
+        }
+        .btn-terminal-copy {
+            background-color: var(--terminal-text); /* Verde para el botón de Copiar */
+            color: #1e1e1e;
+            border: none;
+            font-weight: bold;
+            transition: background-color 0.15s ease-in-out;
+        }
+        .btn-terminal-copy:hover {
+            background-color: #008000; /* Verde más oscuro al pasar el ratón */
+            color: white;
+        }
+    </style>
+</head>
+<body class="p-4 p-md-5">
+
+    <div class="container terminal-container mt-5 mb-5 p-4 p-md-5 rounded">
+        
+        <header class="text-center mb-5 pb-3">
+            <h1 class="display-6 fw-bold terminal-title">⚙️ Panel de Configuración Rápida</h1>
+            <p class="mt-2 text-white-50">Scripts esenciales para la configuración de equipos (<span class="terminal-secondary-text">Automatizado vía GitHub</span>).</p>
+        </header>
+
+        <main id="scripts-container" class="space-y-4">
+            <!-- Los scripts se cargarán aquí -->
+            <div id="loading-spinner" class="text-center p-5">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="mt-3 text-white-50">Cargando scripts desde GitHub...</p>
+            </div>
+        </main>
+
+        <footer class="mt-5 pt-3 border-top border-secondary text-center text-sm text-white-50">
+            Última actualización: <span id="last-updated">Cargando...</span> | Mantenedor: Juan Chirinos (Opensource Dev)
+        </footer>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // =========================================================
+        // === 1. CONFIGURACIÓN DEL REPOSITORIO Y SCRIPTS A MOSTRAR ===
+        // =========================================================
+
+        // --- DEBES CAMBIAR ESTAS VARIABLES CON TUS DATOS ---
+        const GITHUB_USER = 'juaneliezer13'; 
+        const GITHUB_REPO = 'tecnologia-atc';       
+        const GITHUB_BRANCH = 'main';        
+
+        // Arreglo de scripts a mostrar: { title: "Título para el panel", path: "ruta/al/archivo.sh" }
+        const SCRIPTS_TO_DISPLAY = [
+            { title: "Instalación Inicial de Paquetes (Apt)", path: "scripts/inicio.sh" },
+            { title: "Optimización de Swap (ZRAM)", path: "scripts/enable_zramswap.sh" },
+            { title: "Actualización / instalación Google Chrome", path: "scripts/upgrade_install_google_chrome.sh" }
+        ];
+        // =========================================================
+
+        const container = document.getElementById('scripts-container');
+        const lastUpdatedEl = document.getElementById('last-updated');
+
+        /**
+         * Maneja la copia del texto al portapapeles.
+         * @param {string} textToCopy 
+         */
+        function copyToClipboard(textToCopy) {
+            try {
+                // Se prefiere navigator.clipboard, pero se usa execCommand como fallback en IFrames
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        showTemporaryMessage("Copiado al portapapeles!", 'bg-success');
+                    });
+                } else {
+                    // Fallback para entornos restrictivos (como IFrames)
+                    const textarea = document.createElement('textarea');
+                    textarea.value = textToCopy;
+                    textarea.style.position = 'fixed'; 
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    showTemporaryMessage("Copiado al portapapeles! (Fallback)", 'bg-success');
+                }
+            } catch (err) {
+                console.error('Error al copiar:', err);
+                showTemporaryMessage("Error al intentar copiar el código.", 'bg-danger');
+            }
+        }
+        
+        /**
+         * Muestra un mensaje temporal en la parte superior (usando alertas de Bootstrap).
+         * @param {string} message 
+         * @param {string} bgColor Bootstrap background color class (e.g., 'bg-success', 'bg-danger')
+         */
+        function showTemporaryMessage(message, bgColor) {
+            let msgEl = document.getElementById('temp-message');
+            if (!msgEl) {
+                msgEl = document.createElement('div');
+                msgEl.id = 'temp-message';
+                msgEl.className = 'fixed-top p-3 text-center transition-opacity duration-300';
+                document.body.appendChild(msgEl);
+            }
+            
+            // Usar clases de alerta de Bootstrap para el mensaje temporal
+            const alertClass = bgColor.replace('bg-', 'alert-');
+            msgEl.innerHTML = `<div class="alert ${alertClass} alert-dismissible fade show d-inline-block shadow-lg" role="alert" style="opacity: 1;">
+                                    ${message}
+                               </div>`;
+            
+            // Posicionar centralmente
+            const alertDiv = msgEl.querySelector('.alert');
+            alertDiv.style.maxWidth = '400px';
+            msgEl.style.left = '50%';
+            msgEl.style.transform = 'translateX(-50%)';
+            
+            setTimeout(() => {
+                const bsAlert = new bootstrap.Alert(alertDiv);
+                bsAlert.close();
+            }, 3000);
+        }
+
+
+        /**
+         * Construye la URL RAW para obtener el contenido plano del archivo.
+         * @param {string} path Ruta relativa al archivo en el repo.
+         * @returns {string} URL completa.
+         */
+        function buildRawUrl(path) {
+            return `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${path}`;
+        }
+
+        /**
+         * Crea el bloque HTML para un script.
+         * @param {object} script Objeto { title, path }
+         * @param {string} code Contenido del script.
+         */
+        function createScriptBlock(script, code) {
+            const block = document.createElement('div');
+            // Usar la clase de tarjeta de Bootstrap
+            block.className = 'card mb-4 border-secondary shadow'; 
+            
+            const header = document.createElement('div');
+            // Usar clases de Bootstrap para el encabezado y el estilo de terminal
+            header.className = 'card-header terminal-header d-flex justify-content-between align-items-center';
+            header.innerHTML = `
+                <h2 class="h5 mb-0 text-white">${script.title}</h2>
+                <button 
+                    class="btn btn-sm btn-terminal-copy copy-btn"
+                    data-code="${btoa(code)}"
+                >
+                    Copiar Script
+                </button>
+            `;
+            
+            const body = document.createElement('div');
+            body.className = 'card-body p-0';
+
+            const codeEl = document.createElement('pre');
+            codeEl.className = 'code-block m-0';
+            codeEl.textContent = code;
+
+            body.appendChild(codeEl);
+            block.appendChild(header);
+            block.appendChild(body);
+            container.appendChild(block);
+        }
+
+        /**
+         * Inicializa la carga de todos los scripts.
+         */
+        async function loadScripts() {
+            // Eliminar el spinner de carga
+            const spinner = document.getElementById('loading-spinner');
+            if (spinner) spinner.remove();
+
+            const fetchPromises = SCRIPTS_TO_DISPLAY.map(script => 
+                fetch(buildRawUrl(script.path))
+                    .then(res => {
+                        if (!res.ok) {
+                            return `ERROR: No se encontró el archivo o ${res.status}. Verifica la URL: ${script.path}`;
+                        }
+                        return res.text();
+                    })
+                    .then(code => ({ script, code }))
+                    .catch(err => ({ script, code: `ERROR DE RED: ${err.message}` }))
+            );
+
+            const results = await Promise.all(fetchPromises);
+            
+            // Renderizar los resultados
+            results.forEach(({ script, code }) => {
+                createScriptBlock(script, code);
+            });
+            
+            // Asignar eventos de copiado
+            document.querySelectorAll('.copy-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    // El código está codificado en Base64 para evitar problemas con comillas en el atributo data-code
+                    const encodedCode = e.currentTarget.getAttribute('data-code');
+                    const decodedCode = atob(encodedCode);
+                    copyToClipboard(decodedCode);
+                });
+            });
+
+            // Actualizar el pie de página
+            lastUpdatedEl.textContent = new Date().toLocaleDateString('es-ES', { 
+                year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+        }
+
+        // Ejecutar la función de carga al iniciar
+        loadScripts();
+    </script>
+</body>
+</html>

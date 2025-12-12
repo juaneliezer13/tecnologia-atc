@@ -166,6 +166,36 @@
             }, 3000);
         }
 
+        /**
+         * Encode a UTF-8 string to base64 safely.
+         * Uses TextEncoder to properly handle non-Latin1 characters.
+         * @param {string} str
+         * @returns {string}
+         */
+        function utf8_to_b64(str) {
+            const bytes = new TextEncoder().encode(str);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        }
+
+        /**
+         * Decode a base64 string to UTF-8 safely.
+         * Uses TextDecoder to properly handle non-Latin1 characters.
+         * @param {string} b64
+         * @returns {string}
+         */
+        function b64_to_utf8(b64) {
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return new TextDecoder().decode(bytes);
+        }
+
 
         /**
          * Construye la URL RAW para obtener el contenido plano del archivo.
@@ -193,7 +223,7 @@
                 <h2 class="h5 mb-0 text-white">${script.title}</h2>
                 <button 
                     class="btn btn-sm btn-terminal-copy copy-btn"
-                    data-code="${btoa(code)}"
+                    data-code="${utf8_to_b64(code)}"
                 >
                     Copiar Script
                 </button>
@@ -244,7 +274,7 @@
                 button.addEventListener('click', (e) => {
                     // El código está codificado en Base64 para evitar problemas con comillas en el atributo data-code
                     const encodedCode = e.currentTarget.getAttribute('data-code');
-                    const decodedCode = atob(encodedCode);
+                    const decodedCode = b64_to_utf8(encodedCode);
                     copyToClipboard(decodedCode);
                 });
             });
